@@ -13,13 +13,12 @@ const routes = [
         path: "/account/login",
         component: () => import("@/pages/Login.vue"),
     },
-    // 👇 --- NEW ROUTE ADDED HERE (Hyperlocal Shop) --- 👇
     {
         name: "CustomerView",
-        path: "/shop", // Ye URL hoga: /doppiodemo/shop?company=...
+        path: "/shop/:sellerName",
         component: () => import("@/pages/CustomerView.vue"),
+        props: true
     },
-    // 👆 ------------------------------------------------ 👆
 ]
 
 const router = createRouter({
@@ -29,11 +28,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
     let isLoggedIn = session.isLoggedIn
-    try {
-        await userResource.promise
-    } catch (error) {
-        isLoggedIn = false
-    }
+    try { await userResource.promise } catch (error) { isLoggedIn = false }
 
     if (to.name === "Login" && isLoggedIn) {
         next({ name: "Home" })

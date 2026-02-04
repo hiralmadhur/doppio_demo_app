@@ -7,6 +7,9 @@ app_license = "mit"
 
 # Apps
 # ------------------
+website_user_home_page = "doppiodemo"
+
+
 
 # required_apps = []
 
