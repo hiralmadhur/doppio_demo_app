@@ -2,59 +2,89 @@
     <div
         class="h-full flex flex-col bg-white border-r border-gray-200 text-gray-700 font-sans transition-all duration-300">
 
-        <div class="h-14 flex items-center bg-gray-900 text-white shrink-0 shadow-sm px-3"
+        <div class="h-14 flex items-center bg-gray-900 text-white shrink-0 shadow-sm px-3 hover:bg-gray-800 transition-colors"
             :class="isCollapsed ? 'justify-center' : 'justify-between'">
 
-            <div class="flex items-center gap-2 overflow-hidden">
+            <div class="flex items-center gap-2 overflow-hidden cursor-pointer w-full" @click="resetShop">
                 <span class="text-xl">🛒</span>
                 <span v-if="!isCollapsed" class="font-bold text-base tracking-wide text-gray-100">HyperMart</span>
             </div>
 
             <button @click="$emit('close-mobile')" class="lg:hidden text-gray-400 hover:text-white">✕</button>
             <button @click="$emit('toggle-collapse')"
-                class="hidden lg:block text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800">
+                class="hidden lg:block text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800 ml-auto">
                 {{ isCollapsed ? '»' : '«' }}
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto custom-scrollbar text-[13px]">
-            <div v-for="pin in treeData" :key="pin.pincode" class="border-b border-gray-50">
+            <div v-if="loading" class="p-4 text-center text-gray-400">Loading map...</div>
 
-                <button @click="toggle(expandedPincodes, pin.pincode)"
-                    class="w-full flex items-center py-2.5 hover:bg-gray-50 transition-colors group"
-                    :class="isCollapsed ? 'justify-center px-0' : 'justify-between px-3'">
+            <div v-else v-for="pin in treeData" :key="pin.pincode" class="border-b border-gray-50">
 
-                    <div class="flex items-center gap-2.5">
-                        <span class="text-base group-hover:scale-110 transition-transform">📍</span>
-                        <span v-if="!isCollapsed" class="font-semibold text-gray-800">{{ pin.pincode }}</span>
+                <button @click="handleLevelClick('pincode', pin.pincode, {})"
+                    class="w-full flex items-center py-3 hover:bg-gray-50 transition-colors group relative" :class="[
+                        isCollapsed ? 'justify-center px-0' : 'justify-between px-3',
+                        isPincodeActive(pin.pincode) ? 'bg-gray-100 text-gray-900 font-extrabold' : 'text-gray-600'
+                    ]">
+                    <div v-if="isPincodeActive(pin.pincode)" class="absolute left-0 top-0 bottom-0 w-1 bg-gray-800">
                     </div>
-                    <span v-if="!isCollapsed" class="text-[10px] text-gray-400"
-                        :class="isOpen(expandedPincodes, pin.pincode) ? 'rotate-180' : ''">▼</span>
+
+                    <div class="flex items-center gap-3">
+                        <span class="text-base transition-transform"
+                            :class="isPincodeActive(pin.pincode) ? 'scale-110' : 'group-hover:scale-110'">📍</span>
+                        <span v-if="!isCollapsed" class="text-sm">{{ pin.pincode }}</span>
+                    </div>
+                    <span v-if="!isCollapsed" class="text-[10px] text-gray-400 transition-transform duration-300"
+                        :class="expandedPincodes.includes(pin.pincode) ? 'rotate-180' : ''">▼</span>
                 </button>
 
-                <div v-if="isOpen(expandedPincodes, pin.pincode) && !isCollapsed" class="bg-gray-50/50 pb-1">
+                <div v-show="expandedPincodes.includes(pin.pincode) && !isCollapsed"
+                    class="bg-gray-50/50 pb-1 overflow-hidden transition-all">
                     <div v-for="society in pin.societies" :key="society.name">
 
-                        <button @click="toggle(expandedSocieties, society.name)"
-                            class="w-full flex justify-between pl-8 pr-3 py-2 hover:bg-blue-50 text-gray-700 hover:text-blue-700 border-l-[3px] border-transparent hover:border-blue-500 transition-all">
+                        <button @click.stop="handleLevelClick('society', society.name, { pincode: pin.pincode })"
+                            class="w-full flex justify-between pl-8 pr-3 py-2.5 transition-all border-l-[3px] group"
+                            :class="[
+                                isSocietyActive(society.name)
+                                    ? 'bg-blue-50 text-blue-700 font-bold border-blue-600 shadow-sm'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white border-transparent'
+                            ]">
                             <div class="flex items-center gap-2 truncate">
-                                <span class="text-sm opacity-70">🏢</span>
-                                <span class="font-medium truncate">{{ society.name }}</span>
+                                <span class="text-sm opacity-70 group-hover:scale-110 transition-transform">🏢</span>
+                                <span class="truncate">{{ society.name }}</span>
                             </div>
+                            <span class="text-[9px] text-gray-400 transition-transform duration-300"
+                                :class="expandedSocieties.includes(society.name) ? 'rotate-180' : ''">▼</span>
                         </button>
 
-                        <div v-if="isOpen(expandedSocieties, society.name)">
+                        <div v-show="expandedSocieties.includes(society.name)" class="transition-all">
                             <div v-for="category in society.categories" :key="category.name">
-                                <button @click="toggle(expandedCategories, category.name)"
-                                    class="w-full flex items-center gap-2 pl-12 pr-3 py-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider hover:text-orange-600 mt-0.5">
-                                    <span>📂</span><span>{{ category.name }}</span>
+                                <button
+                                    @click.stop="handleLevelClick('category', category.name, { pincode: pin.pincode, society: society.name })"
+                                    class="w-full flex justify-between items-center gap-2 pl-12 pr-3 py-2 text-[11px] uppercase tracking-wider mt-0.5 transition-colors border-l-[3px] border-transparent"
+                                    :class="[
+                                        isCategoryActive(category.name)
+                                            ? 'text-orange-700 font-bold bg-orange-50 border-l-orange-500'
+                                            : 'text-gray-500 font-medium hover:text-gray-800 hover:bg-white'
+                                    ]">
+                                    <div class="flex items-center gap-2">
+                                        <span>📂</span><span>{{ category.name }}</span>
+                                    </div>
+                                    <span class="text-[8px] opacity-50 transition-transform duration-300"
+                                        :class="expandedCategories.includes(category.name) ? 'rotate-180' : ''">▼</span>
                                 </button>
 
-                                <div v-if="isOpen(expandedCategories, category.name)">
+                                <div v-show="expandedCategories.includes(category.name)">
                                     <div v-for="seller in category.sellers" :key="seller.name">
-                                        <button @click="selectSeller(seller, pin.pincode)"
-                                            class="w-full text-left pl-[4rem] pr-3 py-2 text-[13px] text-gray-600 hover:bg-white hover:text-gray-900 flex justify-between items-center group transition-all"
-                                            :class="{ 'bg-yellow-50 text-gray-900 font-bold border-r-4 border-yellow-400': selectedSellerName === seller.name }">
+                                        <button
+                                            @click.stop="navigateTo('seller', { pincode: pin.pincode, society: society.name, category: category.name, sellerName: seller.name })"
+                                            class="w-full text-left pl-[4rem] pr-3 py-2 text-[12px] flex justify-between items-center group transition-all"
+                                            :class="[
+                                                isSellerActive(seller.name, category.name)
+                                                    ? 'bg-yellow-50 text-gray-900 font-bold border-r-4 border-yellow-400 shadow-inner'
+                                                    : 'text-gray-500 hover:bg-white hover:text-gray-900'
+                                            ]">
                                             <div class="flex items-center gap-2 truncate">
                                                 <span>🏪</span><span class="truncate">{{ seller.name }}</span>
                                             </div>
@@ -78,56 +108,94 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { session } from "../data/session"
 
 const props = defineProps(['isCollapsed'])
-const emit = defineEmits(['select-action', 'close-mobile', 'toggle-collapse'])
+const emit = defineEmits(['close-mobile', 'toggle-collapse'])
 
+const router = useRouter()
+const route = useRoute()
 const treeData = ref([])
+const loading = ref(true)
+
 const expandedPincodes = ref([])
 const expandedSocieties = ref([])
 const expandedCategories = ref([])
-const selectedSellerName = ref("")
 
-const toggle = (arr, id) => {
-    const idx = arr.indexOf(id); if (idx > -1) arr.splice(idx, 1); else arr.push(id)
-}
-const isOpen = (arr, id) => arr.includes(id)
+const isPincodeActive = (pincode) => route.params.pincode === pincode
+const isSocietyActive = (societyName) => route.params.society === societyName
+const isCategoryActive = (catName) => route.params.category === catName
+const isSellerActive = (sellerName, catName) => route.params.sellerName === sellerName && route.params.category === catName
 
-const selectSeller = (seller, pincode) => {
-    selectedSellerName.value = seller.name
-    emit('select-action', { action: 'Show Seller Items', seller, pincode })
-    emit('close-mobile')
+const handleLevelClick = (level, id, context) => {
+    if (level === 'pincode') {
+        if (expandedPincodes.value.includes(id)) expandedPincodes.value = []
+        else expandedPincodes.value = [id]
+        navigateTo('pincode', { pincode: id })
+    }
+    else if (level === 'society') {
+        if (expandedSocieties.value.includes(id)) expandedSocieties.value = []
+        else expandedSocieties.value = [id]
+        navigateTo('society', { pincode: context.pincode, society: id })
+    }
+    else if (level === 'category') {
+        if (expandedCategories.value.includes(id)) expandedCategories.value = []
+        else expandedCategories.value = [id]
+        navigateTo('category', { pincode: context.pincode, society: context.society, category: id })
+    }
 }
+
+const navigateTo = (level, params) => {
+    let routeName = ''
+    if (level === 'pincode') routeName = 'ShopPincode'
+    if (level === 'society') routeName = 'ShopSociety'
+    if (level === 'category') routeName = 'ShopCategory'
+    if (level === 'seller') {
+        routeName = 'SellerItems'
+        emit('close-mobile')
+    }
+    router.push({ name: routeName, params: params })
+}
+
+// ✅ RESET SHOP LOGIC: Collapses everything and goes to Home
+const resetShop = () => {
+    expandedPincodes.value = []
+    expandedSocieties.value = []
+    expandedCategories.value = []
+    router.push({ name: 'Home' }) // ✅ Points to Home route
+}
+
+const syncStateWithRoute = () => {
+    const p = route.params
+    if (p.pincode) expandedPincodes.value = [p.pincode]
+    else expandedPincodes.value = []
+
+    if (p.society) expandedSocieties.value = [p.society]
+    else expandedSocieties.value = []
+
+    if (p.category) expandedCategories.value = [p.category]
+    else expandedCategories.value = []
+}
+
+watch(() => route.params, syncStateWithRoute, { deep: true, immediate: true })
 
 const fetchSidebarData = async () => {
+    loading.value = true
     try {
         const res = await fetch('/api/method/doppio_demo.api.get_customer_sidebar_data')
-        if (!res.ok) {
-            console.error(`Sidebar API Error: ${res.status}`);
-            return;
-        }
         const data = await res.json()
         if (data.message && data.message.status === 'success') {
             treeData.value = data.message.data
+            syncStateWithRoute()
         }
-    } catch (e) {
-        console.error("Sidebar fetch failed:", e)
-    }
+    } catch (e) { console.error(e) } finally { loading.value = false }
 }
+
 onMounted(() => fetchSidebarData())
 
-import { session } from "../data/session"
-
 const handleLogout = async () => {
-    try {
-
-        await fetch('/api/method/logout', { method: 'POST' })
-        session.isLoggedIn = false
-        session.user = null
-        window.location.href = '/login'
-    } catch (e) {
-        window.location.href = '/login'
-    }
+    try { await fetch('/api/method/logout', { method: 'POST' }); session.isLoggedIn = false; window.location.href = '/login'; } catch (e) { window.location.href = '/login'; }
 }
 </script>

@@ -8,8 +8,10 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ConfirmDialog: typeof import('./src/components/ConfirmDialog.vue')['default']
     MarketSidebar: typeof import('./src/components/MarketSidebar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    Toast: typeof import('./src/components/Toast.vue')['default']
   }
 }

@@ -1,13 +1,6 @@
 import frappe
 from frappe.utils import getdate, nowdate, add_days, fmt_money
-
-@frappe.whitelist()
-def redirect_to_app(user=None):
-    if not user: user = frappe.session.user
-    roles = frappe.get_roles(user)
-    if "Customer" in roles and "System Manager" not in roles:
-        return "/doppiodemo"
-    return "/app"
+import json
 
 @frappe.whitelist()
 def get_customer_sidebar_data():
@@ -98,8 +91,7 @@ def find_price_recursive(item_code, current_territory, day, target_date):
 @frappe.whitelist()
 def place_custom_order(cart_items, seller_company):
     try:
-        import json
-        items = json.loads(cart_items) # Frontend se list aayegi
+        items = json.loads(cart_items)
         if not items: return {"status": "error", "message": "Cart is empty"}
 
         customer = frappe.db.get_value("Customer", {"user": frappe.session.user}, "name")
@@ -123,41 +115,67 @@ def place_custom_order(cart_items, seller_company):
         frappe.log_error("Order Error", str(e))
         return {"status": "error", "message": str(e)}
 
-
-import frappe
-
 @frappe.whitelist()
 def get_my_orders():
     try:
         user = frappe.session.user
-        # Customer fetch karein
         customer = frappe.db.get_value("Customer", {"user": user}, "name")
-        
-        if not customer:
-            return [] # Empty list return karein agar customer nahi hai
+        if not customer: return []
 
-        # Orders fetch karein
         orders = frappe.get_all("Sales Order", 
-            filters={"customer": customer, "docstatus": ["!=", 2]}, # Cancelled orders chhod kar
-            fields=["name", "grand_total", "status", "transaction_date", "delivery_date"],
+            filters={"customer": customer},
+            fields=["name", "grand_total", "status", "transaction_date", "delivery_date", "docstatus", "company"],
             order_by="creation desc"
         )
 
         for order in orders:
-            # Har order ke items fetch karein
             order_items = frappe.db.get_all("Sales Order Item",
                 filters={"parent": order.name},
                 fields=["item_code", "item_name", "qty", "rate", "amount"]
             )
-            
-            # IMPORTANT: Item Master se Image fetch karein (Kyunki Sales Order Item me image nahi hoti)
             for item in order_items:
                 item["image"] = frappe.db.get_value("Item", item.item_code, "image")
-
             order["items"] = order_items
             
-        return orders # ❌ Pehle hum dict return kar rahe the, ✅ Ab seedha LIST return kar rahe hain
-
+        return orders
     except Exception as e:
         frappe.log_error("API Error", str(e))
         return []
+
+@frappe.whitelist()
+def cancel_custom_order(order_name):
+    try:
+        user = frappe.session.user
+        customer = frappe.db.get_value("Customer", {"user": user}, "name")
+        order = frappe.get_doc("Sales Order", order_name)
+        
+        if order.customer != customer:
+             return {"status": "error", "message": "Unauthorized"}
+        if order.docstatus == 2:
+            return {"status": "error", "message": "Already cancelled."}
+        if order.status == "Completed":
+             return {"status": "error", "message": "Cannot cancel completed order."}
+
+        order.flags.ignore_permissions = True
+        order.cancel()
+        return {"status": "success", "message": "Order cancelled."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@frappe.whitelist()
+def delete_custom_order(order_name):
+    try:
+        user = frappe.session.user
+        customer = frappe.db.get_value("Customer", {"user": user}, "name")
+        order = frappe.get_doc("Sales Order", order_name)
+        
+        if order.customer != customer:
+             return {"status": "error", "message": "Unauthorized"}
+    
+        if order.docstatus == 1:
+             return {"status": "error", "message": "Cannot delete submitted order. Cancel it first."}
+
+        frappe.delete_doc("Sales Order", order_name)
+        return {"status": "success", "message": "Order deleted."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
