@@ -5,7 +5,7 @@
         <div class="h-14 flex items-center bg-gray-900 text-white shrink-0 shadow-sm px-3"
             :class="isCollapsed ? 'justify-center' : 'justify-between'">
 
-            <div class="flex items-center gap-2 overflow-hidden">
+            <div class="flex items-center gap-2 ">
                 <span class="text-xl">🛒</span>
                 <span v-if="!isCollapsed" class="font-bold text-base tracking-wide text-gray-100">HyperMart</span>
             </div>
