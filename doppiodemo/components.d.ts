@@ -12,6 +12,7 @@ declare module 'vue' {
     MarketSidebar: typeof import('./src/components/MarketSidebar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SellerSidebar: typeof import('./src/components/SellerSidebar.vue')['default']
     Toast: typeof import('./src/components/Toast.vue')['default']
   }
 }

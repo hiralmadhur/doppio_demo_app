@@ -179,3 +179,86 @@ def delete_custom_order(order_name):
         return {"status": "success", "message": "Order deleted."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist()
+def get_user_role_info():
+    """Checks role and returns redirection info"""
+    user = frappe.session.user
+    if user == "Guest":
+        return {"role": "Guest"}
+
+    roles = frappe.get_roles(user)
+
+    if "Seller" in roles:
+        # Check User Permission for Company
+        seller_company = frappe.db.get_value("User Permission", 
+            {"user": user, "allow": "Company"}, "for_value")
+        
+        if seller_company:
+            return {
+                "role": "Seller",
+                "company": seller_company,
+                "redirect": "/seller"
+            }
+    
+    # Default to Customer
+    return {
+        "role": "Customer",
+        "redirect": "/"
+    }
+
+@frappe.whitelist()
+def get_seller_orders():
+    """Fetch orders specifically for the logged-in Seller's Company"""
+    user = frappe.session.user
+    
+    # 1. Get Company from Permission
+    seller_company = frappe.db.get_value("User Permission", 
+            {"user": user, "allow": "Company"}, "for_value")
+    
+    if not seller_company:
+        return []
+
+    # 2. Fetch Orders for that Company
+    orders = frappe.get_all("Sales Order",
+        filters={"company": seller_company},
+        fields=["name", "customer_name", "grand_total", "status", "transaction_date"],
+        order_by="creation desc"
+    )
+
+    # 3. Fetch Items
+    for order in orders:
+        order["items"] = frappe.get_all("Sales Order Item",
+            filters={"parent": order.name},
+            fields=["item_code", "item_name", "qty", "amount"]
+        )
+    
+    return orders
+
+@frappe.whitelist()
+def update_order_status(order_name, status):
+    """Allow Seller to update status if order belongs to their company"""
+    try:
+        user = frappe.session.user
+        seller_company = frappe.db.get_value("User Permission", 
+            {"user": user, "allow": "Company"}, "for_value")
+        
+        doc = frappe.get_doc("Sales Order", order_name)
+        
+        # Security Check
+        if doc.company != seller_company:
+            return {"status": "error", "message": "Unauthorized access"}
+
+        if status == 'Completed':
+            doc.db_set('status', 'Completed')
+        else:
+            doc.db_set('status', status)
+        
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+
+        
