@@ -5,7 +5,7 @@
         <div class="h-14 flex items-center bg-gray-900 text-white shrink-0 shadow-sm px-3"
             :class="isCollapsed ? 'justify-center' : 'justify-between'">
 
-            <div class="flex items-center gap-2 ">
+            <div class="flex items-center gap-2 overflow-hidden">
                 <span class="text-xl">🛒</span>
                 <span v-if="!isCollapsed" class="font-bold text-base tracking-wide text-gray-100">HyperMart</span>
             </div>
@@ -107,7 +107,7 @@ const fetchSidebarData = async () => {
             console.error(`Sidebar API Error: ${res.status}`);
             return;
         }
-       const data = await res.json()
+        const data = await res.json()
         if (data.message && data.message.status === 'success') {
             treeData.value = data.message.data
         }
