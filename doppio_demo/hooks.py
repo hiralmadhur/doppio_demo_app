@@ -7,7 +7,7 @@ app_license = "mit"
 
 # Apps
 # ------------------
-website_user_home_page = "doppiodemo"
+website_user_home_page = "/"
 
 
 

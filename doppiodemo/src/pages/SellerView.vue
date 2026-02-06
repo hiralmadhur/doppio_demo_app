@@ -1,121 +1,165 @@
 <template>
-  <div class="flex h-screen bg-gray-50 overflow-hidden relative font-sans text-gray-900">
-    
-    <div v-if="isMobileSidebarOpen" @click="isMobileSidebarOpen = false" 
-         class="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm transition-opacity"></div>
+  <div class="flex h-screen bg-gray-50 font-sans text-gray-900">
+    <Toast ref="toastRef" />
+    <ConfirmDialog ref="confirmRef" />
 
-    <div class="fixed lg:static inset-y-0 left-0 z-50 bg-white shadow-2xl lg:shadow-none transform transition-all duration-300 ease-in-out h-full border-r border-gray-200"
-         :class="[isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0', 'w-64']">
-         
-         <SellerSidebar 
-            :isCollapsed="false"
-            :newOrderCount="pendingOrdersCount"
-            @close-mobile="isMobileSidebarOpen = false"
-            @logout="handleLogout"
-         />
+    <div v-if="isMobileSidebarOpen" @click="isMobileSidebarOpen = false" class="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm transition-opacity"></div>
+
+    <div class="fixed lg:static inset-y-0 left-0 z-20 shadow-xl transform transition-all duration-300 ease-in-out h-full w-72 shrink-0 bg-white"
+         :class="isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
+         <SellerSidebar :isCollapsed="false" @close-mobile="isMobileSidebarOpen = false" @filter-orders="handleCustomerFilter" @reset-filter="handleResetFilter"/>
     </div>
 
-    <div class="flex-1 flex flex-col min-w-0 h-full w-full relative">
-      <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-30 shadow-sm">
-        <div class="flex items-center gap-3">
-           <button @click="isMobileSidebarOpen = true" class="lg:hidden text-xl p-2">☰</button>
-           <h1 class="font-bold text-gray-800 text-xl">{{ pageTitle }}</h1>
-        </div>
-        <div class="flex items-center gap-4">
-             <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded border border-orange-200 font-bold">
-                 {{ session.sellerCompany || 'Store' }}
-             </span>
-        </div>
-      </header>
+    <div class="flex-1 flex flex-col h-full overflow-hidden relative w-full">
+        <header class="bg-white h-16 border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
+            <div class="flex items-center gap-3">
+                <button @click="isMobileSidebarOpen = !isMobileSidebarOpen" class="lg:hidden text-gray-600 text-xl">☰</button>
+                <h1 class="text-xl font-bold text-gray-800">{{ pageTitle }}</h1>
+            </div>
+            <button @click="handleLogout" class="px-3 py-1.5 rounded text-xs font-bold text-red-600 bg-red-50 hover:bg-red-600 hover:text-white border border-red-100 transition-all">Logout</button>
+        </header>
 
-      <div class="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar bg-gray-50/50">
-        
-        <div v-if="route.name === 'SellerDashboard'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-           <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-orange-500">
-              <h3 class="text-gray-500 text-xs font-bold uppercase">Pending Orders</h3>
-              <p class="text-4xl font-bold text-gray-900 mt-2">{{ pendingOrdersCount }}</p>
-           </div>
-           <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-green-500">
-              <h3 class="text-gray-500 text-xs font-bold uppercase">Today's Sales</h3>
-              <p class="text-4xl font-bold text-green-600 mt-2">₹{{ todaySales }}</p>
-           </div>
-        </div>
-
-        <div v-else-if="route.name === 'SellerOrders'" class="space-y-4 max-w-5xl mx-auto">
-            <div v-if="!ordersList.length" class="text-center py-10 text-gray-500">No orders found.</div>
+        <div class="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar bg-gray-50/50">
             
-            <div v-else v-for="order in ordersList" :key="order.name" class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="font-bold">#{{ order.name }}</span>
-                    <span :class="getStatusClass(order.status)" class="text-xs px-2 py-1 rounded font-bold border uppercase">{{ order.status }}</span>
-                </div>
-                <div class="text-sm text-gray-600 mb-2">Customer: {{ order.customer_name }} | Total: ₹{{ order.grand_total }}</div>
-                
-                <div class="bg-gray-50 p-2 rounded mb-3 text-sm">
-                    <div v-for="item in order.items" :key="item.item_code" class="flex justify-between">
-                        <span>{{ item.qty }}x {{ item.item_name }}</span><span>₹{{ item.amount }}</span>
-                    </div>
-                </div>
+            <div v-if="activeCustomerFilter" class="mb-4 flex justify-between items-center bg-orange-50 border border-orange-200 p-3 rounded-lg">
+                <span class="text-orange-800 text-sm font-bold flex gap-2"><span>👤</span> Showing orders for: <span class="uppercase">{{ activeCustomerFilter }}</span></span>
+                <button @click="handleResetFilter" class="text-xs font-bold text-orange-600 hover:underline">Clear</button>
+            </div>
 
-                <div class="flex gap-2 justify-end">
-                    <button v-if="['Pending', 'Draft'].includes(order.status)" @click="updateStatus(order.name, 'Processing')" class="bg-blue-600 text-white px-3 py-1 rounded text-xs">Accept</button>
-                    <button v-if="order.status === 'Processing'" @click="updateStatus(order.name, 'Completed')" class="bg-green-600 text-white px-3 py-1 rounded text-xs">Deliver</button>
+            <div class="space-y-4">
+                <div v-if="sellerOrders.loading" class="text-center py-10"><p class="text-gray-400 text-xs font-bold uppercase">Syncing...</p></div>
+                <div v-else-if="!ordersList.length" class="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300"><p class="text-gray-400 font-bold">No orders found.</p></div>
+
+                <div v-else v-for="order in ordersList" :key="order.name" class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                    
+                    <div class="bg-gray-50 px-6 py-3 border-b border-gray-100 flex justify-between items-center">
+                        <div>
+                            <span class="font-mono font-bold text-gray-900">#{{ order.name }}</span>
+                            <span class="text-xs text-gray-500 ml-2">{{ order.customer_name }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="px-2 py-1 rounded text-[10px] font-bold uppercase border shadow-sm" :class="getStatusClass(order)">
+                                {{ order.docstatus === 0 ? 'Pending Acceptance' : order.status }}
+                            </span>
+                            <span class="font-bold text-gray-800">₹{{ order.grand_total }}</span>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <div v-for="item in order.items" :key="item.item_code" class="flex gap-4 items-center py-3 border-b border-gray-100 last:border-0">
+                            <div class="w-12 h-12 border rounded bg-white p-1 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                <img v-if="item.image" :src="item.image" class="w-full h-full object-contain" />
+                                <div v-else class="text-xl opacity-20">📦</div>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-gray-800">{{ item.item_name }}</p>
+                                <p class="text-xs text-gray-500">{{ item.qty }} x ₹{{ item.amount / item.qty }}</p>
+                            </div>
+                            <span class="text-sm font-bold text-gray-900">₹{{ item.amount }}</span>
+                        </div>
+
+                        <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
+                            
+                            <button v-if="order.docstatus === 0" 
+                                @click="processOrder(order.name)" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-xs font-bold uppercase shadow-md transition-all flex items-center gap-2">
+                                <span>⚡</span> Accept Order
+                            </button>
+
+                            <button v-if="order.docstatus === 1 && (order.per_delivered || 0) < 100" 
+                                @click="createDelivery(order.name)" 
+                                class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg text-xs font-bold uppercase shadow-md transition-all flex items-center gap-2">
+                                <span>🚚</span> Deliver
+                            </button>
+
+                            <button v-if="order.docstatus === 1 && (order.per_billed || 0) < 100" 
+                                @click="createInvoice(order.name)" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-xs font-bold uppercase shadow-md transition-all flex items-center gap-2">
+                                <span>🧾</span> Invoice
+                            </button>
+
+                            <span v-if="isCompleted(order)" class="text-green-600 font-bold text-sm self-center flex items-center gap-1">✅ Completed</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div v-else-if="route.name === 'SellerProducts'" class="text-center py-20 text-gray-500">
-            🚧 Inventory Management Coming Soon
-        </div>
-
-      </div>
     </div>
-    <Toast ref="toastRef" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { createResource } from 'frappe-ui'
 import { session } from '../data/session'
-import SellerSidebar from '../components/SellerSidebar.vue' // ✅
 import Toast from '../components/Toast.vue'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import SellerSidebar from '../components/SellerSidebar.vue'
 
-const route = useRoute()
-const isMobileSidebarOpen = ref(false)
+const router = useRouter()
 const toastRef = ref(null)
+const confirmRef = ref(null)
+const isMobileSidebarOpen = ref(false)
+const activeCustomerFilter = ref(null)
+const pageTitle = computed(() => activeCustomerFilter.value ? 'Filtered Orders' : 'Dashboard')
 
 const sellerOrders = createResource({ url: 'doppio_demo.api.get_seller_orders', auto: true })
 const ordersList = computed(() => sellerOrders.data || [])
-const pendingOrdersCount = computed(() => ordersList.value.filter(o => ['Pending', 'Draft'].includes(o.status)).length)
-const todaySales = computed(() => {
-    const today = new Date().toISOString().split('T')[0]
-    return ordersList.value.filter(o => o.transaction_date === today && o.status !== 'Cancelled').reduce((sum, order) => sum + order.grand_total, 0)
-})
-const pageTitle = computed(() => route.name === 'SellerOrders' ? 'Manage Orders' : 'Seller Dashboard')
 
-const updateStatus = async (orderId, newStatus) => {
+const handleCustomerFilter = (name) => { activeCustomerFilter.value = name; sellerOrders.submit({ customer_name: name }) }
+const handleResetFilter = () => { activeCustomerFilter.value = null; sellerOrders.submit({ customer_name: null }) }
+const handleLogout = async () => { await session.logout.submit(); router.push({ name: 'Home', query: { login: 'true' } }) }
+
+const isCompleted = (order) => (order.per_delivered >= 100 && order.per_billed >= 100) || order.status === 'Completed'
+
+const getStatusClass = (order) => {
+    if (order.docstatus === 0) return 'bg-yellow-100 text-yellow-800' // Draft
+    if (isCompleted(order)) return 'bg-green-100 text-green-800'
+    return 'bg-blue-100 text-blue-800' // Submitted
+}
+
+const processOrder = async (id) => {
     try {
         const res = await fetch('/api/method/doppio_demo.api.update_order_status', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_name: orderId, status: newStatus })
+            body: JSON.stringify({ order_name: id, status: 'To Deliver and Bill' })
         })
         const data = await res.json()
         if (data.message.status === 'success') {
-            toastRef.value.add('Status Updated', 'success')
+            toastRef.value.add('Order Accepted!', 'success')
             sellerOrders.fetch()
-        }
-    } catch(e) { toastRef.value.add('Error', 'error') }
+        } else throw new Error(data.message.message)
+    } catch(e) { toastRef.value.add(e.message, 'error') }
 }
 
-const getStatusClass = (status) => {
-    if (['Pending', 'Draft'].includes(status)) return 'bg-yellow-100 text-yellow-800'
-    if (status === 'Completed') return 'bg-green-100 text-green-800'
-    return 'bg-gray-100'
+const createDelivery = async (id) => {
+    if (!await confirmRef.value.open('Create Delivery?', 'Generate Delivery Note?')) return;
+    try {
+        const res = await fetch('/api/method/doppio_demo.api.create_delivery_note', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_name: id })
+        })
+        const data = await res.json()
+        if (data.message.status === 'success') {
+            toastRef.value.add('Delivery Note Created!', 'success')
+            sellerOrders.fetch()
+        } else throw new Error(data.message.message)
+    } catch(e) { toastRef.value.add(e.message, 'error') }
 }
 
-const handleLogout = async () => {
-    try { await fetch('/api/method/logout', { method: 'POST' }); session.isLoggedIn = false; window.location.href = '/login'; } catch (e) { window.location.href = '/login' }
+const createInvoice = async (id) => {
+    if (!await confirmRef.value.open('Create Invoice?', 'Generate Sales Invoice?')) return;
+    try {
+        const res = await fetch('/api/method/doppio_demo.api.create_sales_invoice', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_name: id })
+        })
+        const data = await res.json()
+        if (data.message.status === 'success') {
+            toastRef.value.add('Invoice Created!', 'success')
+            sellerOrders.fetch()
+        } else throw new Error(data.message.message)
+    } catch(e) { toastRef.value.add(e.message, 'error') }
 }
 </script>
